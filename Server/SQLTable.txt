@@ -1,0 +1,9 @@
+Set up a MySQL table with the following fields:
+Name          Type        Increment
+=========================================
+id            bigint(20)  AUTO_INCREMENT	
+timestamp     bigint(20)	
+temperature   float	
+pressure      float
+humidity      float
+voltage       float
