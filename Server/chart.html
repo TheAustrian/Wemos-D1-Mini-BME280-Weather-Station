@@ -1,0 +1,194 @@
+<html>
+<head>
+<script src="jquery-2.2.3.min.js"></script>
+<script src="canvasjs.js"></script>
+<script type="text/javascript">
+ $(document).ready(function () {
+
+	var dataPointsTemp = [];
+	var dataPointsHumidity = [];
+	var dataPointsPressure = [];
+	var dataPointsVoltage = [];
+
+// Ajax request for getting JSON data
+
+	$.getJSON("datafetch.php", function(result) {
+		for( var i = 0; i < result.length; i++) {
+			dataPointsTemp.push({ x: result[i].x, y: result[i].y1 });
+			dataPointsHumidity.push({ x: result[i].x, y: result[i].y2 });
+			dataPointsPressure.push({ x: result[i].x, y: result[i].y3 });
+			dataPointsVoltage.push({ x: result[i].x, y: result[i].y4 });
+		}	
+	
+		// Chart with label + y values
+
+		var chart = new CanvasJS.Chart("chartContainer1",
+		{
+			axisY:{
+			labelFontSize: 15,
+  			includeZero: false,
+  			},
+  			axisX:{ 
+  			interlacedColor: "#F0F8FF",
+  			gridDashType: "dot",
+			gridThickness: 2,
+   			labelAngle: -30,
+   			labelFontSize: 15,
+   			intervalType: "hour",
+   			labelFormatter: function (e) {
+			return CanvasJS.formatDate( e.value, "MMM DD, HH:mm");
+			},},
+			zoomEnabled: true,
+			title:{
+				text: "Temperature",
+				fontSize: 25,
+			},	
+			data: [
+			{
+				type: "spline",
+      			xValueType: "dateTime",
+      			yValueFormatString:"#######0.00&deg;C",
+				dataPoints: dataPointsTemp
+			}]
+		});
+		chart.render();
+
+		// Chart with label + y2 values
+
+		var chart = new CanvasJS.Chart("chartContainer2",
+		{	
+			axisY:{
+			labelFontSize: 15,
+  			includeZero: false,
+  			},
+  			axisX:{ 
+  			interlacedColor: "#F0F8FF",
+  			gridDashType: "dot",
+			gridThickness: 2,
+   			labelAngle: -30,
+   			labelFontSize: 15,
+   			intervalType: "hour",
+   			labelFormatter: function (e) {
+			return CanvasJS.formatDate( e.value, "MMM DD, HH:mm");
+			},},
+  			zoomEnabled: true,
+			title:{
+				text: "Relative Humidity",
+				fontSize: 25,
+			},	
+			data: [
+			{
+				type: "spline",
+      			xValueType: "dateTime",
+      			yValueFormatString:"#######0.00'%' rel.",
+      			dataPoints: dataPointsHumidity
+			}]
+		});
+		chart.render();
+		
+		
+		
+		
+		var chart = new CanvasJS.Chart("chartContainer3",
+		{	
+			axisY:{
+			labelFontSize: 15,
+  			includeZero: false,
+  			},
+  			axisX:{ 
+  			interlacedColor: "#F0F8FF",
+  			gridDashType: "dot",
+			gridThickness: 2,
+   			labelAngle: -30,
+   			labelFontSize: 15,
+   			intervalType: "hour",
+   			labelFormatter: function (e) {
+			return CanvasJS.formatDate( e.value, "MMM DD, HH:mm");
+			},},
+  			zoomEnabled: true,
+			title:{
+				text: "Air Pressure",
+				fontSize: 25,
+			},	
+			data: [
+			{
+				type: "spline",
+      			xValueType: "dateTime",
+      			yValueFormatString:"#######0.00hPa",
+      			dataPoints: dataPointsPressure
+			}]
+		});
+		chart.render();
+		
+		
+		
+		
+		
+		var chart = new CanvasJS.Chart("chartContainer4",
+		{
+			axisY:{
+			labelFontSize: 15,
+  			minimum: 2.4,
+  			maximum: 4.2,
+  			suffix: " V",
+  			},
+  			axisX:{ 
+  			interlacedColor: "#F0F8FF",
+  			gridDashType: "dot",
+			gridThickness: 2,
+   			labelAngle: -30,
+   			labelFontSize: 15,
+   			intervalType: "hour",
+   			labelFormatter: function (e) {
+			return CanvasJS.formatDate( e.value, "MMM DD, HH:mm");
+			},},
+  			zoomEnabled: true,
+			title:{
+				text: "Battery Voltage",
+				fontSize: 25,
+			},	
+			data: [
+			{
+				type: "spline",
+      			xValueType: "dateTime",
+      			yValueFormatString:"#######0.00V",
+      			dataPoints: dataPointsVoltage
+			}]
+		});
+		chart.render();
+		
+		
+		
+		
+
+		// Chart with label + y and y2 values or multiSeries Chart
+
+		var chart = new CanvasJS.Chart("multiChart",
+		{
+			title:{
+				text: "Chart with y and y2 values"
+			},		
+			data: [
+			{
+				type: "line",
+				dataPoints: dataPointsTemp
+			},
+			{				
+				type: "line",
+				dataPoints: dataPointsHumidity
+			}			
+			]
+		});
+		chart.render();
+	});
+});
+</script>
+</head>
+<body>
+<div id="chartContainer1" style="width: 70%; height: 500px; margin-left: auto ; margin-right: auto ; margin-top: 60px;"></div>
+<div id="chartContainer2" style="width: 70%; height: 500px; margin-left: auto ; margin-right: auto ; margin-top: 60px;"></div>
+<div id="chartContainer3" style="width: 70%; height: 500px; margin-left: auto ; margin-right: auto ; margin-top: 60px;"></div>
+<div id="chartContainer4" style="width: 70%; height: 500px; margin-left: auto ; margin-right: auto ; margin-top: 60px;"></div>
+<!--<div id="multiChart" style="width: 80%; height: 300px;"></div>-->
+</body>
+</html>
