@@ -21,7 +21,7 @@ if (mysqli_connect_errno($conn))
     
     while($row = mysqli_fetch_array($result))
     {        
-        $point = array("x" => $row['timestamp']*1000-7200000 , "y1" => $row['temperature']-2, "y2" => $row['humidity'], "y3" => $row['pressure']/100.0, "y4" => $row['voltage'],);
+        $point = array("x" => $row['timestamp']*1000 , "y1" => $row['temperature']-2, "y2" => $row['humidity'], "y3" => $row['pressure']/100.0, "y4" => $row['voltage'],);
         
         array_push($data_points, $point);        
     }
