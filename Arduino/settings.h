@@ -7,7 +7,7 @@ const char* contenttype = "application/x-www-form-urlencoded";
 
 // Time settings
 static const char ntpServerName[] = "at.pool.ntp.org"; // use "us.pool.ntp.org" for the US, and other values for other countries analogously 
-const int timeZone = 2;     // Central European Time 1 , CEST 2
+const int timeZone = 0;     // Central European Time 1 , CEST 2, but should be handled by the JavaScript when the data is displayed in the browser
 unsigned int localPort = 8888;   // local port to listen for UDP packets
 
 // Application settings
