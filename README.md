@@ -1,5 +1,5 @@
 # Wemos D1 Mini - BME280 Weather Station
-Simple Weather Station Code using an ESP8266 and a BME280 sensor. Data is handled via PHP and stored in a MySQL database. The code offers a buffer for when there is no internet connection available.
+Simple Weather Station Code using an ESP8266 and a BME280 sensor. Data is handled via PHP script. The code is optimized for baterry usage and it offers a buffer for when there is no internet connection available.
 
 #### Parts List:
 - 1x Wemos D1 Mini ESP8266 development board
@@ -11,8 +11,5 @@ Simple Weather Station Code using an ESP8266 and a BME280 sensor. Data is handle
 - 2x Schottky diodes
 - 1x 200k Ohm resistor
 
-
-
-
 #### Schematic:
-![](https://raw.githubusercontent.com/TheAustrian/Wemos-D1-Mini-BME280-Weather-Station/master/schematic.jpg)
+![](schematic.jpg)
