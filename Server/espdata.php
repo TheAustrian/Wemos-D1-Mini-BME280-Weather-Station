@@ -1,29 +1,21 @@
 <?php
-
-if ($_SERVER['HTTP_USER_AGENT'] == "ESP8266HTTPClient" ) {
-		//ESP talking to this site
-		$servername = "YOURMYSQLSERVER";
-		$username = "YOURUSERNAME";
-		$password = "YOURPASSWORD";
-		$dbname = "DATABASENAME";
-
-		if ( !empty($_POST) ) {
-			$conn = mysqli_connect($servername, $username, $password, $dbname);
-
-			$sql = "";
-			foreach ($_POST['d'] as $row) {
-				$sql .= "INSERT INTO weather (timestamp, temperature, pressure, humidity, voltage)
-				VALUES ('" . $row['ti'] . "', '" . $row['t'] . "', '" . $row['p'] . "', '" . $row['h'] . "', '" . $row['v'] . "');";
-			}
-			mysqli_multi_query($conn, $sql);
-			mysqli_close($conn);
-			echo "0";
-		} else {
-			echo "1";
+if ($_SERVER['HTTP_USER_AGENT'] == "ESP8266HTTPClient" )
+{
+		foreach ($_POST["d"] as $key => $value)
+		{
+			$_POST["d"][$key]["time"] = date("Y-m-d H:i:s", time($value["ti"]));
 		}
 
-} else {
-echo "Only for my ESP!   " . "\n\n";
-echo $_SERVER['HTTP_USER_AGENT'];
+		#$data = print_r($_POST, true);
+
+		$data = "";
+		foreach ($_POST["d"] as $key => $value)
+		{
+			$data = $data . $value['id'] . ';' . $value['ti'] . ';' . $value['t'] . ';' . $value['p'] . ';' . $value['h'] . ';' . $value['v'] . ";" . $value['time'] . "\n";
+		}
+
+		file_put_contents("post.txt", $data, FILE_APPEND);
+
+		echo "Got it!";
 }
 ?>
