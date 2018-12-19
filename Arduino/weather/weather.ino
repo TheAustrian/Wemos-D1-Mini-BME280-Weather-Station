@@ -346,7 +346,7 @@ void loop()
   // Go to sleep for the specified time (minus the time we needed for all the stuff we did in the loop)
   loopend = millis();
   worktime = loopend - loopstart;
-  realdelay = SLEEP_DELAY - worktime;
+  realdelay = calculateDelayTime(analogRead(A0) * VOLTAGE_MULTIPLIER, SLEEP_DELAY) - worktime;
 
   if (realdelay > SLEEP_DELAY)
   {

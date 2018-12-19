@@ -1,10 +1,15 @@
-const unsigned long FW_VERSION = 1004;
+const unsigned long FW_VERSION = 1007;
 
-#define SERIAL true
+//#define SERIAL true
 #define SERIAL_BAUD 115200
 
 // if DEEP_SLEEP is defined, ESP will be sent to deep sleep state between two measurement
 #define DEEP_SLEEP true
+// if BATTERY_SAVER_DELAYS defined, delay between two measurements is based on the current battery voltage.
+#define BATTERY_SAVER_DELAYS true
+
+// Sleep time is varied based on the power voltage to ensure battery is always chared properly
+const float TARGET_BATTERY_VOLTAGE = 3.8; // 3.7 V is the voltage of my battery, but we measure a bit over so let's use a bit higher target here
 
 // Network settings
 const char* HOST_NAME = "WeMosMini";

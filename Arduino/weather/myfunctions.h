@@ -273,3 +273,28 @@ void httpUpdate()
     mlog(S_DEBUG, "HTTP update feature was excluded at build time");
   #endif
 }
+
+unsigned long calculateDelayTime(float voltage, unsigned long baseDelay)
+{
+  /*
+   * This function checks current battery voltage and increases delay time lineary based on the measurement.
+   * If current voltage is 2.5 V then delay time will be 5 times higher then in case of TARGET_BATTER_VOLTAGE.
+   * 2.5 V is the minimum operating voltage of ESP8266.
+   * Calculated delay time cannot be less then baseDelay.
+   */
+  
+  #ifdef BATTERY_SAVER_DELAYS
+    unsigned long factor = ( (4*voltage - 4*TARGET_BATTERY_VOLTAGE) / (2,5 - TARGET_BATTERY_VOLTAGE) ) + 1;
+    factor = factor >= 1 ? factor : 1.0;  // factor cannot be smaler then 1
+    
+    unsigned long delayTime = factor * baseDelay;
+    
+    mlog(S_DEBUG, "Delay calculator. Batt.: " + String(voltage) + "V Target: " + String(TARGET_BATTERY_VOLTAGE) + "V Calculated factor: " + String(factor) + " Calculated delay: " + String(delayTime));
+
+    return delayTime;
+  #else
+    mlog(S_DEBUG, "Battery saver mode is disabled!");
+    return baseDelay;
+  #endif
+  
+}
