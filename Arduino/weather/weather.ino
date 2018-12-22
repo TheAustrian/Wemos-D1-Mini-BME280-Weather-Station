@@ -34,6 +34,11 @@ int bufferposition = 0;
 
 // Include functions after declaring other variables they might use
 #include "myfunctions.h"
+#include "otaUpdate.h"
+#include "ntp.h"
+#include "serial.h"
+#include "sensor.h"
+#include "wifi.h"
 
 void setup()
 {
@@ -87,178 +92,6 @@ void setup()
   mlog(S_INFO, "Initialization done");
 }
 
-#ifdef SERIAL
-void setupSerial()
-{
-  Serial.begin(SERIAL_BAUD);
-  while(!Serial)   // Wait for serial port initialization
-  {
-    wdt_reset();
-  }
-}
-#endif
-
-void setupWiFi()
-{
-  mlog(S_INFO, "Start initialization");
-  mlog(S_DEBUG, "WiFi SSID: " + String(WIFI_SSID) + " WiFi password: " + String(WIFI_PASSWORD));
-  
-  wifi_set_sleep_type(LIGHT_SLEEP_T); // LIGHT_SLEEP_T for sleep, NONE_SLEEP_T FOR NO SLEEP
-  
-  WiFi.hostname(HOST_NAME);
-  WiFi.mode(WIFI_STA);
-  
-  mlog(S_INFO, "WiFi MAC: " + WiFi.macAddress());
-  mlog(S_INFO, "Connecting to " + String(WIFI_SSID));
-
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  
-  while (WiFi.waitForConnectResult() != WL_CONNECTED)
-  {
-    mlog(S_INFO, "Waiting for WiFi connection");
-    delay(1000);
-    wdt_reset();
-  }
-
-  mlog(S_INFO, "WiFi connected to " + String(WIFI_SSID));
-
-  IPAddress localIpAddress = WiFi.localIP();
-  char ipc[26];
-  sprintf(ipc, "%d.%d.%d.%d", localIpAddress[0], localIpAddress[1], localIpAddress[2], localIpAddress[3]);
-  mlog(S_INFO, "IP address: " + String(ipc));
-}
-
-void setupNtp()
-{
-  // NTP setup
-  Udp.begin(LOCAL_PORT);
-  setSyncProvider(getNtpTime);
-  setSyncInterval(NTP_UPDATE);
-}
-
-void setupSensor()
-{
-  // Sensor start
-  Wire.begin();
-  
-  while (!mySensor.begin())
-  {
-    mlog(S_ERROR, "Could not find BME280 sensor!");
-    
-    delay(1000);
-    wdt_reset();
-  }
-
-  switch (mySensor.chipModel())
-  {
-     case BME280::ChipModel_BME280:
-     {
-       mlog(S_DEBUG, "Found BME280 sensor! Success.");
-       break;
-     }
-     case BME280::ChipModel_BMP280:
-     {
-       mlog(S_WARNING, "Found BMP280 sensor! No Humidity available.");
-       break;
-     }
-     default:
-     {
-       mlog(S_ERROR, "Found UNKNOWN sensor! Error!");
-     }
-  }
-}
-
-#ifdef OTA
-void setupOta()
-{
-  // OTA update
-
-  // Port defaults to 8266
-  ArduinoOTA.setPort(OTA_PORT);
-
-  // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname(HOST_NAME);
-  
-  // No authentication by default
-  ArduinoOTA.setPassword(OTA_PASSWORD);
-
-  // Password can be set with it's md5 value as well
-  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
-  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
-  
-  ArduinoOTA.onStart([]()
-  {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH)
-    {
-      type = "sketch";
-    }
-    else
-    {
-      // U_SPIFFS
-      type = "filesystem";
-    }
-
-    // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-    mlog(S_INFO, "OTA Start updating " + type);
-  });
-  
-  ArduinoOTA.onEnd([]()
-  {
-    mlog(S_INFO, "OTA end");
-  });
-  
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
-  {
-    mlog(S_INFO, "OTA update progress: " + String((progress / (total / 100))));
-
-    // make the LED blinking
-    if (progress % 2 == 0)
-    {
-      digitalWrite(LED_BUILTIN, HIGH);  // turn led off
-    }
-    else
-    {
-      digitalWrite(LED_BUILTIN, LOW);  // turn led on
-    }
-    
-  });
-  
-  ArduinoOTA.onError([](ota_error_t error)
-  {
-   mlog(S_ERROR, "OTA error[" + String(error) + "]:");
-    
-    if (error == OTA_AUTH_ERROR)
-    {
-      mlog(S_ERROR, "OTA Auth Failed");
-    }
-    else
-    if (error == OTA_BEGIN_ERROR)
-    {
-      mlog(S_ERROR, "OTA Begin Failed");
-    }
-    else
-    if (error == OTA_CONNECT_ERROR)
-    {
-      mlog(S_ERROR, "OTA Connect Failed");
-    }
-    else
-    if (error == OTA_RECEIVE_ERROR)
-    {
-      mlog(S_ERROR, "OTA Receive Failed");
-    }
-    else
-    if (error == OTA_END_ERROR)
-    {
-      mlog(S_ERROR, "OTA End Failed");
-    }
-  });
-  
-  ArduinoOTA.begin();
-  mlog(S_INFO, "OTA ready");
-}
-#endif
-
 void loop()
 {
   mlog(S_INFO, "Current firmware version: " + String(FW_VERSION));
@@ -300,9 +133,9 @@ void loop()
         bufferposition = (bufferposition + 1) % BUFFER_SIZE; // Try the next position. Automagically rolls over if larger than the buffer
      }
     }
-  
+    
     timeBuffer[bufferposition] = now();
-  
+    
     float temp(NAN), hum(NAN), pres(NAN);
     BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
     BME280::PresUnit presUnit(BME280::PresUnit_Pa);
@@ -346,23 +179,26 @@ void loop()
   // Go to sleep for the specified time (minus the time we needed for all the stuff we did in the loop)
   loopend = millis();
   worktime = loopend - loopstart;
-  realdelay = calculateDelayTime(analogRead(A0) * VOLTAGE_MULTIPLIER, SLEEP_DELAY) - worktime;
+  unsigned long calculatedDelay = calculateDelayTime(analogRead(A0) * VOLTAGE_MULTIPLIER, SLEEP_DELAY);
 
-  if (realdelay > SLEEP_DELAY)
+  if (calculatedDelay < worktime)
   {
-    mlog(S_WARNING, "Real delay was adjusted. It was too big! (" + String(realdelay) + ")");
-    
-    realdelay = SLEEP_DELAY;
+    mlog(S_WARNING, "Real delay was adjusted. Worktime was too big! (" + String(realdelay) + ")");
+    realdelay = calculatedDelay;
+  }
+  else
+  {
+    realdelay = calculatedDelay - worktime;
   }
   
-  mlog(S_DEBUG, "Work time: " + String(worktime) + " Real delay: " + String(realdelay));
+  mlog(S_DEBUG, "Work time: " + String(worktime) + " Real delay: " + String(realdelay) + " Calculated delay: " + calculatedDelay);
   
   digitalWrite(LED_BUILTIN, HIGH);  // turn led off to show we are sleeping
-
+  
   // Sleep until the next measurement
   
   mlog(S_INFO, "Sleep for " + String(realdelay / 1000.0) + " sec");
-
+  
   #ifdef DEEP_SLEEP
     // Clear UART FIFO to enter into deep sleep mode immediatelly without waiting for sending over what is in the FIFO
     //SET_PERI_REG_MASK(UART_CONF0(0), UART_TXFIFO_RST); //RESET FIFO 
