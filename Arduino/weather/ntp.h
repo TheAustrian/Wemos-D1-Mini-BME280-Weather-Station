@@ -8,6 +8,7 @@ byte packetBuffer[NTP_PACKET_SIZE]; // buffer to hold incoming & outgoing packet
 void setupNtp()
 {
   // NTP setup
+  mlog(S_DEBUG, "Now: " + String(now()));
   Udp.begin(LOCAL_PORT);
   setSyncProvider(getNtpTime);
   setSyncInterval(NTP_UPDATE);
@@ -15,47 +16,57 @@ void setupNtp()
 
 time_t getNtpTime()
 {
-  wdt_reset();
-  
-  IPAddress ntpServerIP; // NTP server's ip address
-
-  while (Udp.parsePacket() > 0) // discard any previously received packets
+  for (int retryCounter = 0; retryCounter < 100; retryCounter++)
   {
-    wdt_reset();
-  }
-
-  mlog(S_DEBUG, "Transmit NTP Request");
-  
-  // get a random server from the pool
-  WiFi.hostByName(ntpServerName, ntpServerIP);
-
-  char ipc[26];
-  sprintf(ipc, "%d.%d.%d.%d", ntpServerIP[0], ntpServerIP[1], ntpServerIP[2], ntpServerIP[3]);
-  mlog(S_DEBUG, String(ntpServerName) + " has " + String(ipc) + " IP");
-  sendNTPpacket(ntpServerIP);
-  uint32_t beginWait = millis();
-  while (millis() - beginWait < 1500)
-  {
+    digitalWrite(LED_BUILTIN, HIGH);  // turn led off
+    
     wdt_reset();
     
-    int size = Udp.parsePacket();
-    if (size >= NTP_PACKET_SIZE)
+    IPAddress ntpServerIP; // NTP server's ip address
+  
+    while (Udp.parsePacket() > 0) // discard any previously received packets
     {
-      mlog(S_INFO, "Receive NTP response");
-      
-      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
-      unsigned long secsSince1900;
-      // convert four bytes starting at location 40 to a long integer
-      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
-      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-      secsSince1900 |= (unsigned long)packetBuffer[43];
-      return secsSince1900 - 2208988800UL + TIME_ZONE * SECS_PER_HOUR;
+      wdt_reset();
     }
+  
+    mlog(S_DEBUG, "Transmit NTP Request");
+    
+    // get a random server from the pool
+    WiFi.hostByName(ntpServerName, ntpServerIP);
+  
+    char ipc[26];
+    sprintf(ipc, "%d.%d.%d.%d", ntpServerIP[0], ntpServerIP[1], ntpServerIP[2], ntpServerIP[3]);
+    mlog(S_DEBUG, String(ntpServerName) + " has " + String(ipc) + " IP");
+    sendNTPpacket(ntpServerIP);
+    uint32_t beginWait = millis();
+    while (millis() - beginWait < 1500)
+    {
+      wdt_reset();
+      
+      int size = Udp.parsePacket();
+      if (size >= NTP_PACKET_SIZE)
+      {
+        mlog(S_INFO, "NTP response is received");
+        
+        Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+        unsigned long secsSince1900;
+        // convert four bytes starting at location 40 to a long integer
+        secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+        secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+        secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+        secsSince1900 |= (unsigned long)packetBuffer[43];
+        digitalWrite(LED_BUILTIN, LOW);  // turn led off
+        return secsSince1900 - 2208988800UL + TIME_ZONE * SECS_PER_HOUR;
+      }
+    }
+  
+    mlog(S_ERROR, "No NTP response");
+    delay(500);
+    digitalWrite(LED_BUILTIN, LOW);  // turn led on
+    delay(500);
   }
 
-  mlog(S_ERROR, "No NTP response");
-  
+  digitalWrite(LED_BUILTIN, HIGH);  // turn led off
   return 0; // return 0 if unable to get the time
 }
 

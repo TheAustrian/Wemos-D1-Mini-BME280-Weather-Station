@@ -1,10 +1,13 @@
-const unsigned long FW_VERSION = 1011;
+const unsigned long FW_VERSION = 1018;
 
-//#define SERIAL true
+#define SERIAL true
 #define SERIAL_BAUD 115200
 
-// if DEEP_SLEEP is defined, ESP will be sent to deep sleep state between two measurement
-#define DEEP_SLEEP true
+/* 
+ * if DEEP_SLEEP is defined, ESP will be sent to deep sleep state between two measurement.
+ * DEEP SLEP can be disabled by a jamper between D5 and D6 ports.
+  */
+bool DEEP_SLEEP = true;
 // if BATTERY_SAVER_DELAYS defined, delay between two measurements is based on the current battery voltage.
 #define BATTERY_SAVER_DELAYS true
 
@@ -12,12 +15,16 @@ const unsigned long FW_VERSION = 1011;
  * Sleep time is varied based on the power voltage to ensure battery is always chared properly.
  * 3.7 V is the voltage of my battery, but we measure a bit over so let's use a bit higher target here
  */
-const float TARGET_BATTERY_VOLTAGE = 3.9;
+const float TARGET_BATTERY_VOLTAGE = 5.0;
 
 // Network settings
 const char* HOST_NAME = "WeMosMini";
-const char* WIFI_SSID = "MyWifiSsid";
-const char* WIFI_PASSWORD = "MySuperSecretWiFiPAssword123";
+
+const char* WIFI_1_SSID = "ssid1"; 
+const char* WIFI_1_PASSWORD = "passwd1";
+
+const char* WIFI_2_SSID = "ssid2";
+const char* WIFI_2_PASSWORD = "passwd2";
 
 const char* DATA_REST_ENDPOINT = "http://www.example.com/espdata.php";
 const char* CONTENT_TYPE = "application/x-www-form-urlencoded";
@@ -32,7 +39,7 @@ const char* CONTENT_TYPE = "application/x-www-form-urlencoded";
 #define HTTP_UPDATE true
 #ifdef HTTP_UPDATE
   const char* HTTP_UPDATE_URL = "http://www.example.com/update.php";
-  unsigned long HTTP_UPDATE_INTERVAL = 4;
+  unsigned long HTTP_UPDATE_INTERVAL = 5;
 #endif
 
 // Time settings
@@ -41,7 +48,7 @@ const char* CONTENT_TYPE = "application/x-www-form-urlencoded";
 #define NTP_UPDATE 1800
 
 // use "us.pool.ntp.org" for the US, and other values for other countries analogously
-static const char ntpServerName[] = "hu.pool.ntp.org";
+static const char ntpServerName[] = "pool.ntp.org";
 
 // Central European Time 1 , CEST 2, but should be handled by the JavaScript when the data is displayed in the browser
 const int TIME_ZONE = 0;
@@ -50,7 +57,7 @@ const int TIME_ZONE = 0;
 unsigned int LOCAL_PORT = 8888;
 
 // Time between samples in milliseconds
-const unsigned long SLEEP_DELAY = 5 * 60 * 1000;
+const unsigned long SLEEP_DELAY = 30 * 1000;
 
 /* 
  *  Using a 200k resistor between the battery voltage and analog input A0 this experimentally
@@ -76,7 +83,9 @@ const int S_DEBUG = 1;
 const int S_ERROR = 2;
 const int S_WARNING = 3;
 const int S_INFO = 4;
-const int MIN_LOG_SEVERITY = S_INFO;
+const int MIN_LOG_SEVERITY = S_TRACE;
 
 // This can be tweaked, refer to https://github.com/finitespace/BME280 for details
 BME280I2C mySensor;
+
+ESP8266WiFiMulti wifiMulti;

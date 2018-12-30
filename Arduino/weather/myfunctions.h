@@ -49,6 +49,10 @@ void mlog(const int severity, StringSumHelper message)
         break;
       }
     }
+
+    #ifdef SERIAL
+      Serial.flush();
+    #endif
   }
   else
   {
@@ -106,18 +110,20 @@ bool sendSensorData(String sensorData)
   {
     wdt_reset();
     
+    WiFiClient wifiClient;
     HTTPClient post;
-    post.begin(DATA_REST_ENDPOINT);
+    post.useHTTP10(true);
+    post.setTimeout(1000);
+    post.begin(wifiClient, DATA_REST_ENDPOINT);
     post.addHeader("Content-Type", CONTENT_TYPE);
     int httpCode = post.POST(sensorData);
     String payload = post.getString();
     post.end();
     
-    if (httpCode != 200)
+    if (httpCode != HTTP_CODE_OK)
     {
       returnValue = false;
-      
-      mlog(S_INFO, "HTTP send failed. Http code: " + String(httpCode));
+      mlog(S_ERROR, "HTTP send failed. Response code: "  + String(httpCode));
     }
     else
     {
@@ -144,12 +150,46 @@ unsigned long calculateDelayTime(float voltage, unsigned long baseDelay)
    */
   
   #ifdef BATTERY_SAVER_DELAYS
-    unsigned long factor = ( (4*voltage - 4*TARGET_BATTERY_VOLTAGE) / (2,5 - TARGET_BATTERY_VOLTAGE) ) + 1;
-    factor = factor >= 1 ? factor : 1.0;  // factor cannot be smaler then 1
+    float factor = 1.0f;
     
-    unsigned long delayTime = factor * baseDelay;
+    if (voltage >= TARGET_BATTERY_VOLTAGE)
+    {
+      // factor cannot be smaller then 1
+      factor = 1.0f;
+    }
+    else
+    {
+      factor = ( ((4.0f*voltage) - (4.0f*TARGET_BATTERY_VOLTAGE)) / (2.5f - TARGET_BATTERY_VOLTAGE) ) + 1;
+    }
+
+    // Validations...
+    if (factor >= 1)
+    {
+      // might be good but let's see!
+      
+      if (factor > 20)
+      {
+        // too big value!
+        factor = 1.0f;
+        mlog(S_ERROR, "Factor is too big! Please check it immediatelly! New factor value is 1.0!");
+      }
+    }
+    else
+    {
+      // too small value!
+      factor = 1.0f;  // factor cannot be smaler then 1
+      mlog(S_ERROR, "Factor is too small! Please check it immediatelly! New factor value is 1.0!");
+    }
     
-    mlog(S_DEBUG, "Delay calculator. Batt.: " + String(voltage) + "V Target: " + String(TARGET_BATTERY_VOLTAGE) + "V Calculated factor: " + String(factor) + " Calculated delay: " + String(delayTime));
+    unsigned long delayTime = (int)(factor * baseDelay);
+
+    if (delayTime > ESP.deepSleepMax())
+    {
+      mlog(S_WARNING, "delayTime is bigger then deepSleepMax()! Set to max!");
+      delayTime = ESP.deepSleepMax();
+    }
+    
+    mlog(S_DEBUG, "Delay calculator. Batt.: " + String(voltage) + "V Target: " + String(TARGET_BATTERY_VOLTAGE) + "V Calculated factor: " + String(factor) + "x Calculated delay: " + String(delayTime) + "ms");
 
     return delayTime;
   #else

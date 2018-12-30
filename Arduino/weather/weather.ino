@@ -9,6 +9,7 @@
 #include <ArduinoOTA.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
+#include <ESP8266WiFiMulti.h>
 
 extern "C"
 {
@@ -42,13 +43,14 @@ int bufferposition = 0;
 
 void setup()
 {
-  #ifdef DEEP_SLEEP
+  if (DEEP_SLEEP)
+  {
     // In case of deep sleep, initialization is also part of the "loop" what we want to know how long it takes with the actual measurement altogether
     loopstart = millis();
-  #endif
-  
-  // Connect D0 to RST to wake up
-  pinMode(D0, WAKEUP_PULLUP);
+    
+    // Connect D0 to RST to wake up
+    pinMode(D0, WAKEUP_PULLUP);
+  }
   
   delay(1000);  // to make sure Arduino serial monitor is ready to receive messages
   
@@ -73,7 +75,21 @@ void setup()
   #ifdef SERIAL
     setupSerial();
   #endif
-  
+
+  mlog(S_DEBUG, "Reset reason: " + ESP.getResetReason());
+
+  // Check if DEEP SLEEP mode is disabled by jamper between D5-D6 port
+  // (if D5-D6 are connected deep sleep is disabled)
+  pinMode(D5, OUTPUT);
+  digitalWrite(D5, LOW);
+  pinMode(D6, INPUT);
+  unsigned int d6 = digitalRead(D6);
+  if (d6 == 0)
+  {
+    DEEP_SLEEP = false;
+    mlog(S_WARNING, "Deep sleep is disabled by jamper between D5 and D6 ports!");
+  }
+
   setupWiFi();
   setupNtp();
   setupSensor();
@@ -83,11 +99,14 @@ void setup()
   #endif
 
   mlog(S_DEBUG, "Collector URL: " + String(DATA_REST_ENDPOINT));
-  #ifdef DEEP_SLEEP
+  if (DEEP_SLEEP)
+  {
     mlog(S_DEBUG, "Deep sleep is truned ON");
-  #else
+  }
+  else
+  {
     mlog(S_DEBUG, "Deep sleep is turned OFF");
-  #endif
+  }
   
   mlog(S_INFO, "Initialization done");
 }
@@ -95,25 +114,26 @@ void setup()
 void loop()
 {
   mlog(S_INFO, "Current firmware version: " + String(FW_VERSION));
-  
-  #ifdef OTA
-    ArduinoOTA.handle();
-  #endif
-  
+    
   wdt_reset();
   
   digitalWrite(LED_BUILTIN, LOW); // turn led on to show we are working
-  #ifndef DEEP_SLEEP
+  if (!DEEP_SLEEP)
+  {
     loopstart = millis();
-  #endif
+  }
   
   if (justRunOnce == true)
   {
     justRunOnce = false;
     // Code that should just run once after start comes here
     // This is to avoid WDT issues in the setup
-    delay(10); // sensor needs about 2ms to start up
+    delay(500); // sensor needs about 2ms to start up
   }
+
+  #ifdef OTA
+    ArduinoOTA.handle();
+  #endif
   
   // Read sensor data into the buffer
   if (now() >= 100000000) // Make sure we received the time via NTP, no use reading sensor data without proper timestamp
@@ -150,29 +170,39 @@ void loop()
     mlog(S_INFO, "Pressure: " + String(pressureBuffer[bufferposition]) + " Temperature: " + String(tempBuffer[bufferposition]) + " Humiditiy: " + String(humidityBuffer[bufferposition]) + " Voltage: " + voltageBuffer[bufferposition]);
     mlog(S_INFO, String(bufferposition) + " data point are waiting for sending");
   }
-  
-  if (WiFi.status() == WL_CONNECTED)
+
+  int wifiRetryNumber = 5;
+  for (int wifiCounter = 0; wifiCounter < wifiRetryNumber; wifiCounter++) // retry if sending was failed in any way
   {
-    httpUpdate();
-    
-    if (timeStatus() != timeSet || now() <= 100000000)
+    if (wifiMulti.run() == WL_CONNECTED)
     {
-      getNtpTime(); // Update NTP time when necessary
-    }
-    else
-    {
-      if (sendSensorData("0")) // Test if we can connect to the php page and send data if we can
+      httpUpdate();
+      
+      if (timeStatus() != timeSet || now() <= 100000000)
       {
-        mlog(S_DEBUG, "Connection test is okay, send data!");
-        
-        sendSensorData(sensorData()); // sending up to 30 datasets at once (we can only send about 3000 characters in the POST request)
-        
-        mlog(S_INFO, "All data sent.");
+        getNtpTime(); // Update NTP time when necessary
       }
       else
       {
-        mlog(S_ERROR, "Failed to connect");
+        if (sendSensorData("0")) // Test if we can connect to the php page and send data if we can
+        {
+          mlog(S_DEBUG, "Connection test is okay, send data!");
+          
+          sendSensorData(sensorData()); // sending up to 30 datasets at once (we can only send about 3000 characters in the POST request)
+          
+          mlog(S_INFO, "All data sent.");
+        }
+        else
+        {
+          mlog(S_ERROR, "Failed to connect, try again!");
+        }
       }
+      
+      break;
+    }
+    else
+    {
+      mlog(S_ERROR, "WiFi not connected, try again!");
     }
   }
   
@@ -180,34 +210,48 @@ void loop()
   loopend = millis();
   worktime = loopend - loopstart;
   unsigned long calculatedDelay = calculateDelayTime(analogRead(A0) * VOLTAGE_MULTIPLIER, SLEEP_DELAY);
-
-  if (calculatedDelay < worktime)
-  {
-    mlog(S_WARNING, "Real delay was adjusted. Worktime was too big! (" + String(realdelay) + ")");
-    realdelay = calculatedDelay;
-  }
-  else
-  {
-    realdelay = calculatedDelay - worktime;
-  }
   
-  mlog(S_DEBUG, "Work time: " + String(worktime) + " Real delay: " + String(realdelay) + " Calculated delay: " + calculatedDelay);
+  /*
+  realdelay = calculatedDelay - worktime;
+  
+  if (realdelay <= 0 || realdelay >= 1 * 60 * 60 * 1000) // 1 hour
+  {
+    mlog(S_ERROR, "Real delay was adjusted. Worktime was too small or too big! (value=" + String(realdelay) + "ms)");
+    realdelay = 120 * 1000; // exactly 2 mins might be good to show something went wrong
+  }
+  */
+  realdelay = calculatedDelay;
+  
+  mlog(S_DEBUG, "Work time: " + String(worktime) + "ms Calculated delay: " + calculatedDelay + "ms Real delay: " + String(realdelay) + "ms");
   
   digitalWrite(LED_BUILTIN, HIGH);  // turn led off to show we are sleeping
   
   // Sleep until the next measurement
   
-  mlog(S_INFO, "Sleep for " + String(realdelay / 1000.0) + " sec");
-  
-  #ifdef DEEP_SLEEP
+  mlog(S_INFO, "Sleep for " + String(realdelay / 1000) + " sec");
+
+  #ifdef SERIAL
+    Serial.flush();
+  #endif
+
+  if (DEEP_SLEEP)
+  {
     // Clear UART FIFO to enter into deep sleep mode immediatelly without waiting for sending over what is in the FIFO
     //SET_PERI_REG_MASK(UART_CONF0(0), UART_TXFIFO_RST); //RESET FIFO 
     //CLEAR_PERI_REG_MASK(UART_CONF0(0), UART_TXFIFO_RST);
     // https://www.espressif.com/sites/default/files/9b-esp8266-low_power_solutions_en_0.pdf
-    ESP.deepSleep(realdelay * 1000);
-  #else
-    delay(realdelay);
-  #endif
+
+    ESP.deepSleep(realdelay * 1000, WAKE_NO_RFCAL);
+  }
+  else
+  {
+    for (int i = realdelay/100; i > 0; i--)
+    {
+      //mlog(S_TRACE, String(i) + " tick left");
+      delay(100);
+      wdt_reset();
+    }
+  }
   
   // It seems this line never will be called (reboot happens after deep sleep)
   mlog(S_INFO, "Next measurement comes NOW!");
